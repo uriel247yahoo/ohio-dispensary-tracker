@@ -1,0 +1,32 @@
+name: Daily Menu Scraper
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Keeps your manual test button active
+
+jobs:
+  run-scraper:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Copy project code
+      uses: actions/checkout@v4
+
+    - name: Turn on Python environment
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Download Scraping Tools
+      run: |
+        pip install requests beautifulsoup4
+
+    - name: Run Script to Pull Data
+      run: python scraper.py
+
+    - name: Save Updated CSV Data File Back To Workspace
+      run: |
+        git config user.name 'GitHub Automation Bot'
+        git config user.email 'actions@github.com'
+        git add dispensary_menus.csv
+        git diff --staged --quiet || (git commit -m "Automated update of menu data" && git push)
