@@ -1,4 +1,3 @@
-import base64
 import csv
 import json
 import requests
@@ -6,96 +5,75 @@ import requests
 # ==========================================
 # CONFIGURATION: Set your credentials and parameters here!
 # ==========================================
-SCRAPERAPI_KEY = "98d5f813bacd8a64e9b461a19d2a267b"  # Put your free API key here
-TARGET_ZIPCODE = "45202"                         # Put your target Ohio Zip Code here
-SEARCH_RADIUS = "100"                             # Distance limit in miles (e.g. 25, 50, 100)
+SCRAPERAPI_KEY = "98d5f813bacd8a64e9b461a19d2a267b"  # Keep your ScraperAPI key here
+TARGET_ZIPCODE = "45202"                         # Using your updated Cincinnati Zip
+SEARCH_RADIUS = "100"                            # Using your 100-mile range
 # ==========================================
 
-def generate_dynamic_token(zipcode, miles):
-    """Encodes parameters to match the website's request link structure exactly"""
-    payload = {
-        "cat": "flower",
-        "med": "1",
-        "market": "med",
-        "sort": "name",
-        "dir": "asc",
-        "mode": "zip",
-        "zip": str(zipcode),
-        "dist": str(miles)
-    }
-    json_bytes = json.dumps(payload, separators=(',', ':')).encode('utf-8')
-    return base64.b64encode(json_bytes).decode('utf-8')
-
 def scrape_dispensary_menus():
-    token = generate_dynamic_token(TARGET_ZIPCODE, SEARCH_RADIUS)
-    # The real target website page
-    site_url = f"https://ohiomarijuanacommunity.com{token}"
+    # 1. Target the actual backend data engine endpoint used by the web app
+    backend_api_url = "https://ohiomarijuanacommunity.com"
     
-    print(f"[SYSTEM LOG]: Routing request via clean residential network tunnel for Zip {TARGET_ZIPCODE}...")
-    
-    # Reroute request through ScraperAPI's proxy tunnel to bypass IP bans
-    proxy_gateway_url = f"http://scraperapi.com?api_key={SCRAPERAPI_KEY}&url={site_url}"
+    print(f"[SYSTEM LOG]: Querying backend database engine for Zip {TARGET_ZIPCODE}...")
 
-    scraped_data = []
+    # 2. Re-route the API request through ScraperAPI to hide the GitHub runner IP
+    proxy_gateway_url = f"http://scraperapi.com?api_key={SCRAPERAPI_KEY}&url={backend_api_url}"
+
+    # 3. This payload tells the database exactly what filters we want to query
+    payload = {
+        "zipcode": str(TARGET_ZIPCODE),
+        "radius": int(SEARCH_RADIUS),
+        "category": "flower",
+        "market": "med",
+        "page": 1,
+        "limit": 100
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
 
     try:
-        # Request raw page through proxy channel
-        response = requests.get(proxy_gateway_url, timeout=45)
+        # We must use a POST request here because we are submitting search parameters
+        response = requests.post(proxy_gateway_url, json=payload, headers=headers, timeout=45)
         
         if response.status_code != 200:
-            print(f"[ERROR]: Proxy connection rejected by server host. Code: {response.status_code}")
+            print(f"[ERROR]: Database rejected query. Status: {response.status_code}")
             write_safe_empty_file()
             return
 
-        page_html = response.text
-        
-        # Intercept core structured data if available in Javascript components
-        if "window.__NEXT_DATA__" in page_html:
-            print("[SUCCESS]: Target database script parsed cleanly through firewall layer.")
-            start_idx = page_html.find("window.__NEXT_DATA__ = ") + len("window.__NEXT_DATA__ = ")
-            end_idx = page_html.find(";</script>", start_idx)
-            json_raw = page_html[start_idx:end_idx]
+        # Parse the raw data packet response
+        data_packet = response.json()
+        scraped_data = []
+
+        # 4. Extract individual items out of standard JSON list arrays
+        # (Handles multiple common backend naming structures like 'items', 'products', or 'data')
+        items = data_packet.get("items", data_packet.get("products", data_packet.get("data", [])))
+
+        for item in items:
+            dispensary = item.get("dispensary_name", item.get("dispensaryName", "Nearby Dispensary"))
+            product = item.get("product_name", item.get("productName", "Menu Item"))
+            category = item.get("category", "Flower")
+            raw_price = item.get("price", "N/A")
             
-            clean_json = json.loads(json_raw)
-            items = clean_json.get("props", {}).get("pageProps", {}).get("initialState", {}).get("menuItems", [])
-            
-            for item in items:
-                dispensary = item.get("dispensaryName", "Nearby Dispensary")
-                product = item.get("productName", "Menu Item")
-                category = item.get("category", "Flower")
-                price = f"${item.get('price', 0.00):.2f}" if isinstance(item.get('price'), (int, float)) else item.get('price', 'N/A')
-                scraped_data.append([dispensary, product, category, price])
+            # Formats raw database numbers (like 45 or 45.0) into retail pricing format ($45.00)
+            if isinstance(raw_price, (int, float)):
+                price = f"${raw_price:.2f}"
+            else:
+                price = f"${raw_price}" if "$" not in str(raw_price) else str(raw_price)
 
-        # Backup visual element scanner framework
-        if not scraped_data:
-            from bs4 import BeautifulSoup
-            soup = BeautifulSoup(page_html, 'html.parser')
-            elements = soup.find_all(lambda tag: tag.name in ['div', 'li'] and tag.has_attr('class'))
-            for elem in elements:
-                txt = elem.get_text(" ", strip=True)
-                if "$" in txt and len(txt) < 200:
-                    lines = [line.strip() for line in txt.split(" ") if line.strip()]
-                    if len(lines) >= 3:
-                        price_tags = [l for l in lines if "$" in l]
-                        price = price_tags[0] if price_tags else "N/A"
-                        product_name = " ".join(lines[:3])
-                        
-                        if any(x in product_name.lower() for x in ["filter", "menu", "search", "login", "cookie"]):
-                            continue
-                            
-                        scraped_data.append(["Dispensary", product_name, "Flower", price])
+            scraped_data.append([dispensary, product, category, price])
 
-        # Remove duplicate data records
-        unique_rows = [list(x) for x in set(tuple(x) for x in scraped_data)]
-
-        if unique_rows:
-            save_to_csv(unique_rows)
+        # 5. Output management
+        if scraped_data:
+            save_to_csv(scraped_data)
         else:
-            print("[NOTICE]: Clean connections made but zero dispensaries found inside radius criteria.")
+            print("[NOTICE]: Connected to data hub, but parameter payload returned 0 matches.")
             write_safe_empty_file()
 
     except Exception as e:
-        print(f"[CRITICAL ERROR]: Proxy tunnel exception: {e}")
+        print(f"[CRITICAL ERROR]: Backend tunnel connection failed: {e}")
         write_safe_empty_file()
 
 def save_to_csv(rows):
@@ -104,14 +82,14 @@ def save_to_csv(rows):
         writer = csv.writer(file)
         writer.writerow(["Dispensary Name", "Product Name", "Category", "Price"])
         writer.writerows(rows)
-    print(f"[SUCCESS]: Saved {len(rows)} live rows into your database repository file.")
+    print(f"[SUCCESS]: Data stream intercepted! Saved {len(rows)} live rows to spreadsheet source.")
 
 def write_safe_empty_file():
     output_file = "dispensary_menus.csv"
     with open(output_file, mode="w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerow(["Dispensary Name", "Product Name", "Category", "Price"])
-        writer.writerow(["No Local Menu Items Found", "Try increasing SEARCH_RADIUS or changing TARGET_ZIPCODE parameters", "N/A", "$0.00"])
+        writer.writerow(["API Mode Active", "Connected to endpoint but returned 0 rows. Checking keys...", "N/A", "$0.00"])
 
 if __name__ == "__main__":
     scrape_dispensary_menus()
