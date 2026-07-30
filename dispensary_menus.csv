@@ -1,2 +1,2 @@
 Dispensary Name,Product Name,Category,Price
-No Local Menu Items Found,Try increasing SEARCH_RADIUS or changing TARGET_ZIPCODE parameters,N/A,$0.00
+API Mode Active,Connected to endpoint but returned 0 rows. Checking keys...,N/A,$0.00
