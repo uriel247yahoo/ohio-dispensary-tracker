@@ -31,8 +31,11 @@ def scrape_dispensary_menus():
     token = generate_dynamic_token(TARGET_ZIPCODE, SEARCH_RADIUS)
     site_url = f"https://ohiomarijuanacommunity.com{token}"
     
-    print(f"[SYSTEM LOG]: Tunnelling connection via ScraperAPI to target: {site_url}")
-    proxy_gateway_url = f"http://scraperapi.com?api_key={SCRAPERAPI_KEY}&url={site_url}"
+    print(f"[SYSTEM LOG]: Activating Advanced Anti-Bot Bypass Tunnel...")
+    
+    # NEW GATEWAY: Tells ScraperAPI to solve firewalls using a real virtual browser screen
+    proxy_gateway_url = f"http://scraperapi.com?api_key={SCRAPERAPI_KEY}&url={site_url}&render=true&autoparse=true"
+
 
     scraped_data = []
 
