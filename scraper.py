@@ -5,7 +5,7 @@ import requests
 # ==========================================
 # CONFIGURATION: Change these two values whenever you want!
 # ==========================================
-TARGET_ZIPCODE = "43215"  # Put your Ohio Zip Code here
+TARGET_ZIPCODE = "45238"  # Put your Ohio Zip Code here
 SEARCH_RADIUS = "25"      # Put your distance limit in miles here (e.g. 10, 25, 50)
 # ==========================================
 
