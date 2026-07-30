@@ -8,7 +8,7 @@ import requests
 # ==========================================
 SCRAPERAPI_KEY = "98d5f813bacd8a64e9b461a19d2a267b"  # Put your free API key here
 TARGET_ZIPCODE = "45202"                         # Put your target Ohio Zip Code here
-SEARCH_RADIUS = "40"                             # Distance limit in miles (e.g. 25, 50, 100)
+SEARCH_RADIUS = "100"                             # Distance limit in miles (e.g. 25, 50, 100)
 # ==========================================
 
 def generate_dynamic_token(zipcode, miles):
